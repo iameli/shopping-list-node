@@ -1,5 +1,6 @@
 var express    = require('express');
 var bodyParser = require('body-parser');
+var morgan     = require('morgan');
 var jsonParser = bodyParser.json();
 
 
@@ -9,6 +10,21 @@ var Storage = {
     this.items.push(item);
     this.setId += 1;
     return item;
+  },
+
+  delete: function(id) {
+    this.items.splice(this.getIndex(id), 1);
+  },
+
+  update: function(id, name) {
+    this.items[this.getIndex(id)].name = name;
+  },
+
+  getIndex: function(id) {
+    var itemIds = this.items.map(function(item) {
+      return item.id;
+    });
+    return itemIds.indexOf(id);
   }
 };
 
@@ -16,7 +32,7 @@ var Storage = {
 var createStorage = function() {
   var storage = Object.create(Storage);
   storage.items = [];
-  storage.setId = 1;
+  storage.setId = 0;
   return storage;
 };
 
@@ -32,15 +48,27 @@ storage.add('Peppers');
 var responseDeletePut = function(request, response) {
   var itemId  = parseInt((request.params.id), 10);
 
-  var itemIds = storage.items.map(function(item) {
-    return item.id;
-  });
+  var indexOfItem = storage.getIndex(itemId);
 
   if(isNaN(itemId)) {
 
     response.status(400).send();
 
-  } else if (itemIds.indexOf(itemId) > -1) {
+  } else if (indexOfItem > -1) {
+
+    switch (request.method) {
+      case 'DELETE' :
+        storage.delete(itemId);
+        break;
+
+      case 'PUT' :
+        if (!('name' in request.body)) {
+          return response.sendStatus(400);
+        }
+
+        storage.update(itemId, request.body.name);
+        break;
+    }
 
     response.status(200).send('Update made.');
 
@@ -54,7 +82,7 @@ var responseDeletePut = function(request, response) {
         break;
 
       case 'DELETE' :
-        response.status(404).send('Your request cannot be found.');
+        response.status(404).end('Your request cannot be found.');
         break;
     }
   }
@@ -62,6 +90,8 @@ var responseDeletePut = function(request, response) {
 
 
 var app = express();
+
+app.use(morgan('combined'));
 app.use(express.static('public'));
 
 
